@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: controller/index.controller.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: controller/index.controller.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * This file controls all actions on the overview page.
+ *
+ * @module indexController
+ * @author Malte311
+ */
+
+// This indicates how many recent spendings should be shown.
+const numberOfRecentSpendings = 5;
+// Same for recent earnings
+const numberOfRecentEarnings = numberOfRecentSpendings;
+
+/**
+ * This function initializes the page when its loaded. This means it sets the
+ * language and the dynamic content.
+ */
+function loadPage() {
+    // We will always set the language first.
+    setLanguage( readPreference( "language" ) );
+    // Display all the other content.
+	updateView();
+	
+	if (readPreference("backupFail")) {
+		dialog.showErrorBox("Backup failed", "The backup was not successful last time. Please note that cross-disk is not supported.");
+		storePreference("backupFail", false);
+	}
+}
+
+/**
+ * This function returns recent data
+ * @param {String} type The type of transactions we want to get (earning/spending)
+ * @return {JSON[]} An array containing the data.
+ */
+function getRecentTransactions( type ) {
+    // Get the correct limit, in case the limits are different.
+    var limit = (type === "earning" ? numberOfRecentEarnings : numberOfRecentSpendings);
+    // Get all .json files which contain data (mainStorage is excluded in getJSONFiles).
+    var JSONFiles = getJSONFiles();
+    var newJSONFiles = [];
+    // Before searching, we need to sort the files so we can start searching in the newest file.
+    for ( var i = 0; i &lt; JSONFiles.length; i++ ) {
+        // In order to search the files, we reverse the filenames (e.g. "01.2018" => "2018.01").
+        // To do this, we make sure the filenames are in the correct format.
+        // This regular expression makes sure that there are two digits followed by a dot and
+        // another four digits. Nothing else is allowed.
+        if ( /^(\d\d[.]\d\d\d\d)$()/.test( JSONFiles[i] ) ) {
+            // Filename ok? Reverse it.
+            var tmp = JSONFiles[i].split( "." );
+            JSONFiles[i] = tmp[1] + "." + tmp[0];
+            newJSONFiles.push( JSONFiles[i] );
+        }
+        // Filename invalid? Remove it from array (don't push anything to the new array).
+        // Note: splice() does not work here, since the array length will be cut
+        // and therefore the loop will end too early.
+    }
+    // Now we can sort the files.
+    JSONFiles = newJSONFiles.sort();
+    // Declare a quest to search for the correct type of data.
+    var quest = { connector:'or', params:[['type', type]] };
+    // Declare a variable to store the data in.
+    var data = [];
+    // Search for the most recent data (they may be in older files, thats why we iterate).
+    // Remember that we need to reverse the names again (undo the reverse).
+    // Also, we loop backwards, because we want to begin with the newest file.
+    for ( var i = JSONFiles.length - 1; i >= 0; i-- ) {
+        // Reverse again to undo the reverse.
+        var tmp = JSONFiles[i].split( "." );
+        JSONFiles[i] = tmp[1] + "." + tmp[0] + ".json";
+        // This appends the data to the existing array (we want to append at the beginning
+        // because the most recent data is at the end).
+        data = getData( JSONFiles[i], quest ).concat( data );
+        // Found enough data? Stop looping. Otherwise we search in the next file.
+        if ( data.length >= limit ) break;
+    }
+    // Return the array with data.
+    return data;
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-balancesController.html">balancesController</a></li><li><a href="module-balancesView.html">balancesView</a></li><li><a href="module-config.html">config</a></li><li><a href="module-controller.html">controller</a></li><li><a href="module-electronMenu.html">electronMenu</a></li><li><a href="module-helpController.html">helpController</a></li><li><a href="module-indexController.html">indexController</a></li><li><a href="module-indexView.html">indexView</a></li><li><a href="module-JSONhandler.html">JSONhandler</a></li><li><a href="module-JSONupdater.html">JSONupdater</a></li><li><a href="module-pdfview.html">pdfview</a></li><li><a href="module-settingsController.html">settingsController</a></li><li><a href="module-settingsView.html">settingsView</a></li><li><a href="module-updates.html">updates</a></li><li><a href="module-view.html">view</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Fri Jan 03 2020 17:06:02 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

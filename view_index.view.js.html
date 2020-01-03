@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: view/index.view.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: view/index.view.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * This file is responsible for the view on the overview page.
+ *
+ * @module indexView
+ * @author Malte311
+ */
+
+var textElements;
+
+/**
+ * This function displays the current surplus for each budget. This means,
+ * it will display the difference between all earnings from the current month
+ * and all spendings from the current month.
+ */
+function displayBalances() {
+    // Reset previous content.
+    $( "#currentBalances" ).html( "" );
+    // Get all budgets to iterate over them.
+    var currentBudgets = readMainStorage( "budgets" );
+    var totalSum = 0;
+    // Display the monthly surplus for every budget.
+    for ( var i = 0; i &lt; currentBudgets.length; i++ ) {
+        // Set the name of the budget as a heading.
+        $( "#currentBalances" ).append(
+            "&lt;h5>&lt;i class=\"fas fa-angle-double-right w3-text-deep-purple\">&lt;/i>" + " " +
+                currentBudgets[i][0] +
+            " &lt;/h5>"
+        );
+        // Find out the sum of earnings and spendings in this month,
+        // so we can calculate the surplus.
+        var quest = { connector:'or', params:[['budget', currentBudgets[i][0]]] };
+        var dataObj = getData( getCurrentFileName(), quest );
+        // Add all earnings and spendings from this month.
+        var totalEarningsThisMonth = 0, totalSpendingsThisMonth = 0;
+        // Make sure, that data exists. Otherwise we will stay at a surplus of zero.
+        if ( dataObj !== undefined ) {
+            // Now, add up all the amounts for earnings and spendings each.
+            for ( var j = 0; j &lt; dataObj.length; j++ ) {
+                // Earning? Increase totalEarningsThisMonth.
+                if ( dataObj[j].type === "earning" ) {
+                    totalEarningsThisMonth =
+                        Math.round( (totalEarningsThisMonth + dataObj[j].amount) * 1e2 ) / 1e2;
+                }
+                // Spending? Increase totalSpendingsThisMonth.
+                else if ( dataObj[j].type === "spending" ) {
+                    totalSpendingsThisMonth =
+                        Math.round( (totalSpendingsThisMonth + dataObj[j].amount) * 1e2 ) / 1e2;
+                }
+            }
+        }
+        // Now, find out if the difference between earnings and spendings is
+        // either positive, negative or neutral (zero).
+        var percentage = 100;
+        var color;
+        // Positive balance for this month:
+        if ( totalEarningsThisMonth - totalSpendingsThisMonth > 0 ) {
+            // Calculate the ratio of how much money is left from this months
+            // earnings and use the color green.
+            if ( totalEarningsThisMonth > 0 &amp;&amp; totalSpendingsThisMonth !== 0 ) {
+                percentage = ((totalEarningsThisMonth - totalSpendingsThisMonth) / totalEarningsThisMonth) * 100;
+            }
+            color = "green";
+        }
+        // Balance negative: Red color, percentage still at 100 (so the complete bar is red).
+        else if ( totalEarningsThisMonth - totalSpendingsThisMonth &lt; 0 ) {
+            color = "red";
+        }
+        // Balance is exactly zero for this month: Gray color and percentage still at 100:
+        else {
+            color = "gray";
+        }
+        // We want to display $2.50 instead of $2.50000000002 (this may happen since we use floating point numbers),
+        // so we round the balance.
+        var balance = Math.round( (totalEarningsThisMonth - totalSpendingsThisMonth) * 1e2 ) / 1e2;
+        totalSum += balance;
+        balance = beautifyAmount( balance );
+
+        // Now we are ready to display a progress bar which contains the difference.
+        $( "#currentBalances" ).append(
+            "&lt;p>&lt;/p>&lt;div class=\"w3-grey\">&lt;div class=\"w3-container w3-center w3-padding w3-" +
+            color + "\" style=\"width:" + percentage + "%;\">" + balance + getCurrencySign() +
+            "&lt;/div>&lt;/div>"
+        );
+
+        // After doing this for all budgets, we display the total sum for the current month.
+        if ( i == currentBudgets.length - 1 ) {
+            totalSum = beautifyAmount( Math.round( totalSum * 1e2 ) / 1e2 );
+            $( "#currentBalances" ).append(
+                "&lt;br>" +
+                "&lt;center>" +
+                    textElements.totalSum + ": " +
+                    totalSum + getCurrencySign() +
+                "&lt;/center>"
+            );
+        }
+    }
+}
+
+/**
+ * This function displays the recent spendings and earnings, if they exist.
+ * @param {String} type The type of transactions we want to display (earning/spending)
+ */
+function displayRecentTransactions( type ) {
+    // Get recent data.
+    var data = getRecentTransactions( type );
+    // Make sure that some data exists.
+    if ( data.length > 0 ) {
+        // Get the correct limit, in case the limits are different.
+        var limit = (type === "earning" ? numberOfRecentEarnings : numberOfRecentSpendings);
+        // We will append the HTML content to this string.
+        var recentTransactionsTable = "&lt;table class=\"w3-table-all w3-striped w3-white\">";
+        // Now, we just need to display the data. Remember that new data is at the end, so
+        // we need to loop backwards.
+        for ( var i = data.length - 1; i >= 0; i-- ) {
+            var amount = beautifyAmount( data[i].amount );
+            recentTransactionsTable += "&lt;tr>&lt;td>&lt;i class=\"far fa-money-bill-alt w3-text-green w3-large\">&lt;/i>" +
+                                       " " + data[i].name + " &lt;/td>" +
+                                       "&lt;td>&lt;i>" + amount + getCurrencySign() + "&lt;/i>&lt;/td>" +
+                                       "&lt;td>&lt;i>" + dateToString( data[i].date ) + "&lt;/i>&lt;/td>&lt;/tr>";
+            // Display only limit many items (defined in index.controller.js).
+            if ( data.length - limit === i ) break;
+        }
+        // Display the table with recent transactions.
+        $( "#" + type + "Recent" ).html(
+            "&lt;h3>&lt;i class=\"fa fa-arrow-right w3-text-green w3-large\">&lt;/i> " +
+            (type == "spending" ?
+            textElements.recentSpendings :
+            textElements.recentEarnings) +
+            " &lt;/h3>" +
+            recentTransactionsTable + "&lt;/table>"
+        );
+    }
+    // Display a message that no data exists yet.
+    else {
+        $( "#" + type + "Recent" ).html(
+            "&lt;h3>&lt;i class=\"fa fa-arrow-right w3-text-green w3-large\">&lt;/i> " +
+            (type == "spending" ?
+            textElements.recentSpendings :
+            textElements.recentEarnings) +
+            " &lt;/h3>&lt;i>" +
+            (type == "spending" ?
+            textElements.noRecentSpendings :
+            textElements.noRecentEarnings) +
+            "&lt;/i>"
+        );
+    }
+}
+
+/**
+ * This function displays a chart which visualizes all time transactions.
+ * @param {String} type The type of transactions we want to visualize (earning/spending)
+ */
+function displayChart( type ) {
+    // Reset the canvas in case no data existed before (then the HTML content was overwritten).
+    $( "#" + type + "ChartDiv" ).html(
+        "&lt;canvas id=\"" + type + "\" width=\"8000\" height=\"2500\">&lt;/canvas>" );
+    // Get a reference to the canvas in which the chart should be.
+    var transactionChart = $( "#" + type )[0];
+    // Get all budgets.
+    var allTimeTransactions = (type === "earning" ?
+                              readMainStorage( "allTimeEarnings" ) :
+                              readMainStorage( "allTimeSpendings" ));
+    // Declare some variables to store the values in them.
+    var labels = [], dataset = [];
+    // We will declare a variable to make sure there is at least one earning/spending.
+    // In addition to that, this will contain the sum of all spendings/earnings.
+    var checksum = 0;
+    // Iterate over them to get the all time spendings.
+    for ( var i = 0; i &lt; allTimeTransactions.length; i++ ) {
+        // Get the name of every budget.
+        labels.push( allTimeTransactions[i][0] );
+        // Get the balance of every budget
+        dataset.push( beautifyAmount( allTimeTransactions[i][1] ) );
+        // Add the amount to sum up all transactions.
+        checksum = (Math.round( (checksum + allTimeTransactions[i][1]) * 1e2 ) / 1e2);
+    }
+    // Now check if there exists at least one earning/spending.
+    if ( checksum > 0 ) {
+        checksum = beautifyAmount( checksum );
+        // Create the chart. The colors are declared as a constant in controller.js.
+        createChart( transactionChart, labels, dataset, colors, colors,
+                     readPreference( "chartType" ) );
+        // Display the sum of all time earnings/spendings.
+        $( "#" + type + "ChartDiv" ).append(
+            "&lt;br>&lt;center>" +
+            (type == "spending" ?
+            textElements.allTimeSpendings :
+            textElements.allTimeEarnings) + ": " +
+            checksum + getCurrencySign() + "&lt;/center>"
+        );
+    }
+    // Otherwise display a message that there is no data yet.
+    else {
+        $( "#" + type + "ChartDiv" ).html(
+            "&lt;i>" + (type == "spending" ?
+                    textElements.noSpendings :
+                    textElements.noEarnings) +
+            "&lt;/i>"
+        );
+    }
+}
+
+/**
+ * This function updates the view anytime changes are made.
+ */
+function updateView() {
+    textElements = require( "./text/index_" + getLanguage() + ".json.js" );
+    // Display current balances.
+    displayBalances();
+    // Display a table of recent spendings.
+    displayRecentTransactions( "spending" );
+    // Display all time spendings.
+    displayChart( "spending" );
+    // Display a table of recent earnings.
+    displayRecentTransactions( "earning" );
+    // Display all time earnings.
+    displayChart( "earning" );
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Modules</h3><ul><li><a href="module-balancesController.html">balancesController</a></li><li><a href="module-balancesView.html">balancesView</a></li><li><a href="module-config.html">config</a></li><li><a href="module-controller.html">controller</a></li><li><a href="module-electronMenu.html">electronMenu</a></li><li><a href="module-helpController.html">helpController</a></li><li><a href="module-indexController.html">indexController</a></li><li><a href="module-indexView.html">indexView</a></li><li><a href="module-JSONhandler.html">JSONhandler</a></li><li><a href="module-JSONupdater.html">JSONupdater</a></li><li><a href="module-pdfview.html">pdfview</a></li><li><a href="module-settingsController.html">settingsController</a></li><li><a href="module-settingsView.html">settingsView</a></li><li><a href="module-updates.html">updates</a></li><li><a href="module-view.html">view</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Fri Jan 03 2020 17:06:02 GMT+0000 (Greenwich Mean Time)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>
